@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>AU LABS Hub</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+/* â”€â”€ Reset & Tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#222534;--border:#2e3147;
+  --accent:#6c63ff;--accent2:#4ade80;--text:#e2e4f0;--muted:#6b7280;
+  --danger:#f87171;--warn:#fbbf24;
+  --sst:#3b82f6;--crd:#f59e0b;--ene:#10b981;--trd:#8b5cf6;
+  --prog:#06b6d4;--imp:#f97316;--casa:#ec4899;
+  --r:10px;--shadow:0 4px 24px rgba(0,0,0,.4);--chat-w:340px;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:14px}
+
+/* â”€â”€ Setup screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#setup-screen{
+  position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;
+}
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;width:440px;max-width:95vw}
+.setup-card h1{font-size:22px;font-weight:700;color:var(--accent);margin-bottom:6px}
+.setup-card p{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6}
+.setup-step{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.setup-card input{
+  width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:10px 14px;color:var(--text);font-size:13px;font-family:monospace;margin-bottom:12px;
+}
+.setup-card input:focus{outline:none;border-color:var(--accent)}
+.setup-card a{color:var(--accent);font-size:11px;text-decoration:none}
+.setup-card a:hover{text-decoration:underline}
+.setup-help{font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6;background:var(--surface2);padding:10px 14px;border-radius:8px;border:1px solid var(--border)}
+.setup-help code{font-family:monospace;color:var(--accent2);font-size:10px}
+
+/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;gap:4px}
+.logo{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.logo h1{font-size:18px;font-weight:700;color:var(--accent)}
+.logo span{font-size:11px;color:var(--muted)}
+.nav-label{padding:8px 20px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;transition:background .15s;font-size:13px;color:var(--muted);border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--surface2);color:var(--text);border-left:3px solid var(--accent)}
+.nav-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+#sync-indicator{margin:auto 20px 12px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--accent2)}
+.sync-dot.syncing{background:var(--warn);animation:blink 1s infinite}
+.sync-dot.error{background:var(--danger)}
+
+/* â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#topbar{height:56px;min-height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:8px}
+#topbar h2{font-size:16px;font-weight:600;flex:1}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:filter .15s;white-space:nowrap}
+.btn:hover{filter:brightness(1.15)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-danger{background:#7f1d1d;color:var(--danger)}
+.btn-ai{background:linear-gradient(135deg,#6c63ff,#a855f7);color:#fff}
+.btn-ai.active{box-shadow:0 0 0 2px #a855f7}
+#content{flex:1;overflow-y:auto;padding:24px}
+
+/* â”€â”€ Dashboard stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;cursor:default}
+.stat-card .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.stat-card .value{font-size:28px;font-weight:700}
+.stat-card .sub{font-size:11px;color:var(--muted);margin-top:4px}
+.section-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.mb16{margin-bottom:16px}
+.mb24{margin-bottom:24px}
+
+/* â”€â”€ Kanban â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.kanban-wrap{display:flex;gap:14px;overflow-x:auto;padding-bottom:8px}
+.kanban-col{min-width:260px;width:260px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);display:flex;flex-direction:column;max-height:calc(100vh - 200px)}
+.col-header{display:flex;align-items:center;gap:8px;padding:14px 14px 10px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.col-count{margin-left:auto;background:var(--surface2);border-radius:999px;padding:2px 8px;font-size:11px;color:var(--muted)}
+.col-body{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.col-body.drag-over{background:rgba(108,99,255,.08)}
+.col-add{padding:8px 14px 12px;border-top:1px solid var(--border)}
+.col-add button{width:100%;padding:7px;border-radius:7px;border:1px dashed var(--border);background:none;color:var(--muted);cursor:pointer;font-size:12px;transition:all .15s}
+.col-add button:hover{border-color:var(--accent);color:var(--accent)}
+.empty{text-align:center;color:var(--muted);padding:20px;font-size:12px}
+
+/* â”€â”€ Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:grab;transition:box-shadow .15s,transform .1s,border-color .3s;user-select:none}
+.card:hover{box-shadow:0 4px 16px rgba(0,0,0,.3);transform:translateY(-1px)}
+.card.dragging{opacity:.4}
+.card.ai-highlight{border-color:var(--accent);box-shadow:0 0 0 2px rgba(108,99,255,.4);animation:pulse 1s ease}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(108,99,255,.5)}100%{box-shadow:0 0 0 8px rgba(108,99,255,0)}}
+.card-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}
+.card-title{font-size:13px;font-weight:500;flex:1;line-height:1.4}
+.badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chip{font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 6px}
+.chip.date{color:var(--warn)}
+.chip.monto{color:var(--accent2)}
+.card-actions{display:flex;gap:4px;margin-top:10px;opacity:0;transition:opacity .15s}
+.card:hover .card-actions{opacity:1}
+.card-actions button{padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s}
+.card-actions button:hover{color:var(--text);border-color:var(--accent)}
+.card-actions .del:hover{color:var(--danger);border-color:var(--danger)}
+
+/* â”€â”€ Pipeline pedidos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.pipeline{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px}
+.pip-col{min-width:200px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.pip-header{padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+.pip-body{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:60px}
+.pip-body.drag-over{background:rgba(108,99,255,.08)}
+.pip-card{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px;cursor:grab;transition:border-color .3s}
+.pip-card:hover{border-color:var(--imp)}
+.pip-card.ai-highlight{border-color:var(--accent);animation:pulse 1s ease}
+.pip-card .pclient{font-size:10px;color:var(--muted);margin-top:3px}
+.pip-card .pmonto{font-size:11px;color:var(--accent2);margin-top:4px;font-weight:600}
+.pip-card .pfecha{font-size:10px;color:var(--warn)}
+
+/* â”€â”€ Tab bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.tab-bar{display:flex;gap:4px;margin-bottom:20px;background:var(--surface);padding:4px;border-radius:8px;width:fit-content;border:1px solid var(--border);overflow-x:auto;max-width:100%}
+.tab-btn{padding:6px 12px;border-radius:6px;border:none;background:none;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tab-btn.active{background:var(--surface2);color:var(--text)}
+
+/* â”€â”€ Area color classes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.a-sst{background:#1e3a5f;color:var(--sst)}.a-crd{background:#4c2d0a;color:var(--crd)}
+.a-ene{background:#064e3b;color:var(--ene)}.a-trd{background:#3b0764;color:var(--trd)}
+.a-prog{background:#0c4a6e;color:var(--prog)}.a-imp{background:#431407;color:var(--imp)}
+.a-casa{background:#500724;color:var(--casa)}
+
+/* â”€â”€ Chat panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#chat-panel{width:0;min-width:0;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .25s,min-width .25s}
+#chat-panel.open{width:var(--chat-w);min-width:var(--chat-w)}
+#chat-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.ai-badge{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6c63ff,#a855f7);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+#chat-header h3{font-size:14px;font-weight:600;flex:1}
+.ai-status{font-size:10px;color:var(--accent2);display:flex;align-items:center;gap:4px}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--accent2);display:inline-block}
+.close-chat{background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:2px}
+.close-chat:hover{color:var(--text)}
+#chat-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.msg{display:flex;gap:8px;animation:fadeUp .2s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{flex-direction:row-reverse}
+.mavatar{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px}
+.msg.user .mavatar{background:var(--surface2);border:1px solid var(--border)}
+.msg.assistant .mavatar{background:linear-gradient(135deg,#6c63ff,#a855f7)}
+.mbubble{max-width:88%;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.55}
+.msg.user .mbubble{background:var(--accent);color:#fff;border-bottom-right-radius:3px}
+.msg.assistant .mbubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:3px}
+.mbubble strong{color:var(--accent2)}.mbubble em{color:var(--warn);font-style:normal}
+.thinking{display:flex;align-items:center;gap:4px;padding:10px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;border-bottom-left-radius:3px}
+.thinking span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite}
+.thinking span:nth-child(2){animation-delay:.2s}.thinking span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+#chat-input-wrap{padding:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.quick-chips{display:flex;gap:5px;flex-wrap:wrap}
+.qchip{font-size:10px;padding:4px 9px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.qchip:hover{border-color:var(--accent);color:var(--accent)}
+.input-row{display:flex;gap:8px;align-items:flex-end}
+#chat-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;color:var(--text);font-size:13px;font-family:inherit;resize:none;min-height:38px;max-height:120px;transition:border-color .15s;line-height:1.4}
+#chat-input:focus{outline:none;border-color:var(--accent)}
+#chat-input::placeholder{color:var(--muted)}
+#send-btn{width:36px;height:36px;border-radius:9px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:filter .15s}
+#send-btn:hover{filter:brightness(1.15)}
+#send-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* â”€â”€ Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:100}
+#overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow)}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:20px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;transition:border-color .15s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent)}
+.form-group textarea{resize:vertical;min-height:80px}
+.form-group select option{background:var(--surface2)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
+/* â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-left:4px solid var(--accent2);border-radius:8px;padding:12px 18px;font-size:13px;box-shadow:var(--shadow);transform:translateY(80px);opacity:0;transition:all .25s;z-index:300}
+#toast.show{transform:translateY(0);opacity:1}
+
+/* â”€â”€ Scrollbars â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* â”€â”€ Loading skeleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.skeleton{background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:6px;height:80px;margin-bottom:8px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+
+<!-- â•â•â•â• SETUP SCREEN â•â•â•â• -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <h1>ðŸ–¨ AU LABS Hub</h1>
+    <p>Conecta tu Supabase para empezar. Solo se hace una vez.</p>
+
+    <div class="setup-help">
+      <strong>Tablas Supabase requeridas</strong> â€” ejecuta este SQL en tu proyecto:<br><br>
+      <code>
+        CREATE TABLE tasks (id TEXT PRIMARY KEY, data JSONB, created_at TIMESTAMPTZ DEFAULT NOW());<br>
+        CREATE TABLE pedidos (id TEXT PRIMARY KEY, data JSONB, created_at TIMESTAMPTZ DEFAULT NOW());<br>
+        CREATE TABLE chat_history (id SERIAL PRIMARY KEY, role TEXT, content TEXT, created_at TIMESTAMPTZ DEFAULT NOW());<br>
+        ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;<br>
+        ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;<br>
+        ALTER TABLE chat_history ENABLE ROW LEVEL SECURITY;<br>
+        CREATE POLICY "allow_all" ON tasks FOR ALL USING (true) WITH CHECK (true);<br>
+        CREATE POLICY "allow_all" ON pedidos FOR ALL USING (true) WITH CHECK (true);<br>
+        CREATE POLICY "allow_all" ON chat_history FOR ALL USING (true) WITH CHECK (true);
+      </code>
+    </div>
+
+    <div class="setup-step">Supabase URL</div>
+    <input id="sb-url" type="text" placeholder="https://xxxx.supabase.co">
+
+    <div class="setup-step">Supabase Anon Key (pÃºblica)</div>
+    <input id="sb-anon" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+
+    <p style="margin-bottom:12px">
+      EncuÃ©ntralas en <a href="https://supabase.com/dashboard" target="_blank">supabase.com/dashboard</a> â†’ Settings â†’ API
+    </p>
+    <button class="btn btn-primary" onclick="saveSetup()">Conectar â†’</button>
+  </div>
+</div>
+
+<!-- â•â•â•â• SIDEBAR â•â•â•â• -->
+<nav id="sidebar" style="display:none">
+  <div class="logo">
+    <h1>ðŸ–¨ AU LABS</h1>
+    <span>Hub de operaciones</span>
+  </div>
+
+  <div class="nav-label">Vistas</div>
+  <button class="nav-item active" onclick="navigate('dashboard')">ðŸ“Š Dashboard</button>
+  <button class="nav-item" onclick="navigate('bitacora')">ðŸ“‹ BitÃ¡cora</button>
+  <button class="nav-item" onclick="navigate('pedidos')">ðŸ“¦ Pedidos Aulabs</button>
+
+  <div class="nav-label" style="margin-top:12px">Ãreas</div>
+  <button class="nav-item" onclick="navigate('bitacora','ðŸ¦º SST')"><span class="dot" style="background:var(--sst)"></span>ðŸ¦º SST</button>
+  <button class="nav-item" onclick="navigate('bitacora','ðŸ—ï¸ CRD')"><span class="dot" style="background:var(--crd)"></span>ðŸ—ï¸ CRD</button>
+  <button class="nav-item" onclick="navigate('bitacora','ðŸ½ï¸ ENEFOOD')"><span class="dot" style="background:var(--ene)"></span>ðŸ½ï¸ ENEFOOD</button>
+  <button class="nav-item" onclick="navigate('bitacora','ðŸ“ˆ Trading')"><span class="dot" style="background:var(--trd)"></span>ðŸ“ˆ Trading</button>
+  <button class="nav-item" onclick="navigate('bitacora','ðŸ’» ProgramaciÃ³n')"><span class="dot" style="background:var(--prog)"></span>ðŸ’» ProgramaciÃ³n</button>
+  <button class="nav-item" onclick="navigate('bitacora','ðŸ–¨ï¸ ImpresiÃ³n 3D')"><span class="dot" style="background:var(--imp)"></span>ðŸ–¨ï¸ ImpresiÃ³n 3D</button>
+  <button class="nav-item" onclick="navigate('bitacora','ðŸ  Casa')"><span class="dot" style="background:var(--casa)"></span>ðŸ  Casa</button>
+
+  <div id="sync-indicator" style="margin-top:auto">
+    <span class="sync-dot" id="sdot"></span>
+    <span id="sync-label">Sincronizado</span>
+  </div>
+</nav>
+
+<!-- â•â•â•â• MAIN â•â•â•â• -->
+<div id="main" style="display:none">
+  <div id="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <button class="btn btn-ghost" onclick="navigate(currentView)" title="Recargar">âŸ³</button>
+    <button class="btn btn-primary" id="btn-add" onclick="openModal()">ï¼‹ Nueva</button>
+    <button class="btn btn-ai" id="btn-chat" onclick="toggleChat()">âœ¦ Agente IA</button>
+  </div>
+  <div id="content"><div style="padding:40px;text-align:center;color:var(--muted)">Cargando...</div></div>
+</div>
+
+<!-- â•â•â•â• CHAT PANEL â•â•â•â• -->
+<div id="chat-panel">
+  <div id="chat-header">
+    <div class="ai-badge">âœ¦</div>
+    <div style="flex:1">
+      <h3>Agente AU LABS</h3>
+      <div class="ai-status"><span class="sdot" id="ai-sdot"></span><span id="ai-status-txt">Listo</span></div>
+    </div>
+    <button class="close-chat" onclick="toggleChat()">Ã—</button>
+  </div>
+  <div id="chat-messages"></div>
+  <div id="chat-input-wrap">
+    <div class="quick-chips">
+      <span class="qchip" onclick="quickSend('Â¿cÃ³mo vamos hoy?')">ðŸ“Š Resumen</span>
+      <span class="qchip" onclick="quickSend('Â¿quÃ© pedidos tengo activos?')">ðŸ“¦ Pedidos</span>
+      <span class="qchip" onclick="quickSend('Â¿quÃ© tareas tengo pendientes esta semana?')">ðŸ“‹ Pendientes</span>
+      <span class="qchip" onclick="quickSend('Â¿cuÃ¡nto he recibido este mes?')">ðŸ’° Ingresos</span>
+    </div>
+    <div class="input-row">
+      <textarea id="chat-input" placeholder="CuÃ©ntame quÃ© pasÃ³ hoy..." rows="1"
+        onkeydown="chatKey(event)" oninput="autoResize(this)"></textarea>
+      <button id="send-btn" onclick="sendChat()">âž¤</button>
+    </div>
+  </div>
+</div>
+
+<!-- â•â•â•â• MODAL â•â•â•â• -->
+<div id="overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <h3 id="modal-title">Nueva actividad</h3>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// CONSTANTS
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const SB_KEY  = 'aulabs_supabase';
+const AREAS   = [
+  {key:'ðŸ¦º SST',color:'#3b82f6'},{key:'ðŸ—ï¸ CRD',color:'#f59e0b'},
+  {key:'ðŸ½ï¸ ENEFOOD',color:'#10b981'},{key:'ðŸ“ˆ Trading',color:'#8b5cf6'},
+  {key:'ðŸ’» ProgramaciÃ³n',color:'#06b6d4'},{key:'ðŸ–¨ï¸ ImpresiÃ³n 3D',color:'#f97316'},
+  {key:'ðŸ  Casa',color:'#ec4899'},
+];
+const TIPOS     = ['ðŸ“‹ Tarea','âš™ï¸ Avance','ðŸ›’ Compra','ðŸ’¡ Idea','ðŸ“ Nota','â° Recordatorio','ðŸ“‹ InspecciÃ³n'];
+const ESTADOS   = ['â¬œ Por hacer','ðŸ”„ Haciendo','âœ… Finalizado'];
+const PED_STAGES= ['Cotizando','Confirmado','En producciÃ³n','Listo para entrega','Entregado'];
+const E_COLORS  = {'â¬œ Por hacer':'#6b7280','ðŸ”„ Haciendo':'#f59e0b','âœ… Finalizado':'#4ade80'};
+const P_COLORS  = {Cotizando:'#6b7280',Confirmado:'#3b82f6','En producciÃ³n':'#f59e0b','Listo para entrega':'#8b5cf6',Entregado:'#4ade80'};
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// STATE
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+let sb = null;           // Supabase client
+let currentView = 'dashboard';
+let filterArea  = null;
+let editingId   = null;
+let editingType = null;
+let dragId = null; dragType = null;
+let chatOpen   = false;
+let chatHistory = [];    // [{role,content}]
+let aiThinking  = false;
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// SETUP
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function saveSetup() {
+  const url  = document.getElementById('sb-url').value.trim();
+  const anon = document.getElementById('sb-anon').value.trim();
+  if (!url || !anon) { toast('âš ï¸ Completa ambos campos'); return; }
+  localStorage.setItem(SB_KEY, JSON.stringify({ url, anon }));
+  initApp(url, anon);
+}
+
+async function initApp(url, anon) {
+  sb = supabase.createClient(url, anon);
+  // Quick connectivity test
+  const { error } = await sb.from('tasks').select('id').limit(1);
+  if (error) {
+    toast('âŒ Error: ' + error.message + ' â€” revisa URL/key y que las tablas existan');
+    return;
+  }
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('sidebar').style.display      = 'flex';
+  document.getElementById('main').style.display         = 'flex';
+  await loadChatHistory();
+  navigate('dashboard');
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// SUPABASE DATA LAYER
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function setSyncing(state) {
+  const dot = document.getElementById('sdot');
+  const lbl = document.getElementById('sync-label');
+  if (!dot) return;
+  dot.className = 'sync-dot' + (state==='syncing'?' syncing':state==='error'?' error':'');
+  lbl.textContent = state==='syncing'?'Sincronizando...':state==='error'?'Error de sync':'Sincronizado';
+}
+
+async function getTasks() {
+  const { data, error } = await sb.from('tasks').select('*').order('created_at', {ascending:false});
+  if (error) throw error;
+  return (data||[]).map(r=>({...r.data, id:r.id}));
+}
+
+async function getPedidos() {
+  const { data, error } = await sb.from('pedidos').select('*').order('created_at', {ascending:false});
+  if (error) throw error;
+  return (data||[]).map(r=>({...r.data, id:r.id}));
+}
+
+function uid() { return '_'+Math.random().toString(36).slice(2,11); }
+
+async function createTask(obj) {
+  setSyncing('syncing');
+  const id = obj.id || uid();
+  const today = new Date().toISOString().slice(0,10);
+  const full = { id, creado:today, horaInicio:'', horaFin:'', costoCLP:null, proyecto:'', detalle:'', fecha:'', ...obj };
+  const { error } = await sb.from('tasks').insert({ id, data:full });
+  setSyncing(error?'error':'ok');
+  if (error) throw error;
+  return full;
+}
+
+async function updateTask(id, patch) {
+  setSyncing('syncing');
+  // Fetch current
+  const { data, error:fe } = await sb.from('tasks').select('*').eq('id',id).single();
+  if (fe) { setSyncing('error'); throw fe; }
+  const updated = { ...data.data, ...patch };
+  const { error } = await sb.from('tasks').update({ data:updated }).eq('id',id);
+  setSyncing(error?'error':'ok');
+  if (error) throw error;
+  return updated;
+}
+
+async function deleteTask(id) {
+  setSyncing('syncing');
+  const { error } = await sb.from('tasks').delete().eq('id',id);
+  setSyncing(error?'error':'ok');
+  if (error) throw error;
+}
+
+async function createPedido(obj) {
+  setSyncing('syncing');
+  const id = obj.id || uid();
+  const today = new Date().toISOString().slice(0,10);
+  const full = { id, creado:today, pagado:false, fechaEntrega:'', notas:'', producto:'', monto:0, ...obj };
+  const { error } = await sb.from('pedidos').insert({ id, data:full });
+  setSyncing(error?'error':'ok');
+  if (error) throw error;
+  return full;
+}
+
+async function updatePedido(id, patch) {
+  setSyncing('syncing');
+  const { data, error:fe } = await sb.from('pedidos').select('*').eq('id',id).single();
+  if (fe) { setSyncing('error'); throw fe; }
+  const updated = { ...data.data, ...patch };
+  const { error } = await sb.from('pedidos').update({ data:updated }).eq('id',id);
+  setSyncing(error?'error':'ok');
+  if (error) throw error;
+  return updated;
+}
+
+async function deletePedido(id) {
+  setSyncing('syncing');
+  const { error } = await sb.from('pedidos').delete().eq('id',id);
+  setSyncing(error?'error':'ok');
+  if (error) throw error;
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// NAVIGATION
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function navigate(view, area) {
+  currentView=view; filterArea=area||null;
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  const addBtn=document.getElementById('btn-add');
+  if(view==='dashboard'){
+    document.querySelectorAll('.nav-item')[0].classList.add('active');
+    document.getElementById('page-title').textContent='Dashboard';
+    addBtn.textContent='ï¼‹ Nueva'; addBtn.onclick=()=>openModal();
+    renderDashboard();
+  } else if(view==='bitacora'){
+    document.getElementById('page-title').textContent=area?`${area}`:'BitÃ¡cora';
+    addBtn.textContent='ï¼‹ Tarea'; addBtn.onclick=()=>openModal();
+    renderBitacora();
+  } else if(view==='pedidos'){
+    document.getElementById('page-title').textContent='ðŸ“¦ Pedidos Aulabs';
+    addBtn.textContent='ï¼‹ Pedido'; addBtn.onclick=()=>openPedidoModal();
+    renderPedidos();
+  }
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// DASHBOARD
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+async function renderDashboard() {
+  setContent('<div style="padding:30px;text-align:center;color:var(--muted)">Cargando...</div>');
+  const [tasks, pedidos] = await Promise.all([getTasks(), getPedidos()]);
+  const today  = new Date().toISOString().slice(0,10);
+  const tmw7   = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+  const activas   = tasks.filter(t=>t.estado!=='âœ… Finalizado');
+  const haciendo  = tasks.filter(t=>t.estado==='ðŸ”„ Haciendo');
+  const vencen    = tasks.filter(t=>t.fecha&&t.fecha<=tmw7&&t.estado!=='âœ… Finalizado');
+  const pedActivos= pedidos.filter(p=>!['Entregado','Cancelado'].includes(p.estado));
+  const pedEnProd = pedidos.filter(p=>p.estado==='En producciÃ³n');
+  const ingMes    = pedidos.filter(p=>p.pagado&&p.creado>=today.slice(0,7)).reduce((s,p)=>s+(p.monto||0),0);
+
+  setContent(`
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Tareas activas</div><div class="value" style="color:var(--accent)">${activas.length}</div><div class="sub">${haciendo.length} en progreso</div></div>
+      <div class="stat-card"><div class="label">Pedidos activos</div><div class="value" style="color:var(--imp)">${pedActivos.length}</div><div class="sub">${pedEnProd.length} en producciÃ³n</div></div>
+      <div class="stat-card"><div class="label">Vencen esta semana</div><div class="value" style="color:var(--warn)">${vencen.length}</div><div class="sub">prÃ³ximos 7 dÃ­as</div></div>
+      <div class="stat-card"><div class="label">Ingresos del mes</div><div class="value" style="color:var(--accent2)">${fmtCLP(ingMes)}</div><div class="sub">pedidos pagados</div></div>
+    </div>
+    <div class="grid2 mb24">
+      <div>
+        <div class="section-title mb16">ðŸ“Œ En progreso</div>
+        ${haciendo.length===0?'<div class="empty">Sin actividades en curso</div>':haciendo.map(t=>miniCard(t)).join('')}
+        ${vencen.filter(t=>t.estado!=='ðŸ”„ Haciendo').slice(0,2).map(t=>miniCard(t,true)).join('')}
+      </div>
+      <div>
+        <div class="section-title mb16">ðŸ“¦ Pipeline</div>
+        ${renderMiniPipeline(pedidos)}
+      </div>
+    </div>
+    <div class="section-title mb16">ðŸ“Š Por Ã¡rea</div>
+    <div class="stats-grid">
+      ${AREAS.map(a=>{
+        const tot=tasks.filter(t=>t.area===a.key).length;
+        const pnd=tasks.filter(t=>t.area===a.key&&t.estado==='â¬œ Por hacer').length;
+        return `<div class="stat-card" style="cursor:pointer;border-left:3px solid ${a.color}" onclick="navigate('bitacora','${a.key}')">
+          <div class="label">${a.key}</div><div class="value" style="font-size:20px">${tot}</div>
+          <div class="sub">${pnd} pendientes</div></div>`;
+      }).join('')}
+    </div>`);
+}
+
+function miniCard(t,warn=false){
+  return `<div class="card mb16" style="cursor:pointer" onclick="openModal('${t.id}')">
+    <div class="card-top">
+      <span>${tipoIcon(t.tipo)}</span>
+      <span class="card-title">${t.titulo}</span>
+      <span class="badge ${areaClass(t.area)}">${t.area.slice(0,6)}</span>
+    </div>
+    <div class="card-meta">
+      ${t.fecha?`<span class="chip date">${fmtDate(t.fecha)}</span>`:''}
+      ${t.costoCLP?`<span class="chip monto">${fmtCLP(t.costoCLP)}</span>`:''}
+    </div>
+  </div>`;
+}
+
+function renderMiniPipeline(pedidos){
+  const stages=['En producciÃ³n','Listo para entrega','Confirmado'];
+  return stages.map(s=>{
+    const items=pedidos.filter(p=>p.estado===s).slice(0,3);
+    if(!items.length) return '';
+    return `<div class="mb16"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">${s}</div>
+      ${items.map(p=>`<div class="pip-card" style="cursor:pointer;margin-bottom:6px" onclick="openPedidoModal('${p.id}')">
+        <strong style="font-size:12px">${p.pedido}</strong>
+        <div class="pclient">${p.cliente}</div>
+        <div class="pmonto">${fmtCLP(p.monto)} ${p.pagado?'âœ…':'ðŸ’³'}</div>
+        ${p.fechaEntrega?`<div class="pfecha">ðŸ“… ${fmtDate(p.fechaEntrega)}</div>`:''}
+      </div>`).join('')}
+    </div>`;
+  }).join('')||'<div class="empty">Sin pedidos activos</div>';
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// BITÃCORA KANBAN
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+async function renderBitacora() {
+  setContent('<div style="padding:30px;text-align:center;color:var(--muted)">Cargando...</div>');
+  let tasks = await getTasks();
+  if(filterArea) tasks=tasks.filter(t=>t.area===filterArea);
+
+  setContent(`
+    <div class="tab-bar">
+      <button class="tab-btn ${!filterArea?'active':''}" onclick="filterArea=null;renderBitacora()">Todas</button>
+      ${AREAS.map(a=>`<button class="tab-btn ${filterArea===a.key?'active':''}"
+        onclick="filterArea='${a.key}';document.getElementById('page-title').textContent='${a.key}';renderBitacora()">${a.key.slice(0,8)}</button>`).join('')}
+    </div>
+    <div class="kanban-wrap">
+      ${ESTADOS.map(estado=>{
+        const cards=tasks.filter(t=>t.estado===estado);
+        return `<div class="kanban-col">
+          <div class="col-header">
+            <span style="width:8px;height:8px;border-radius:50%;background:${E_COLORS[estado]};display:inline-block"></span>
+            ${estado}<span class="col-count">${cards.length}</span>
+          </div>
+          <div class="col-body" id="col-${slug(estado)}"
+            ondragover="dragOver(event,'${estado}')"
+            ondrop="dropTask(event,'${estado}')"
+            ondragleave="this.classList.remove('drag-over')">
+            ${cards.length===0?'<div class="empty">Sin actividades</div>':''}
+            ${cards.map(t=>taskCard(t)).join('')}
+          </div>
+          <div class="col-add"><button onclick="openModal(null,'${estado}','${filterArea||''}')">ï¼‹ Agregar</button></div>
+        </div>`;
+      }).join('')}
+    </div>`);
+}
+
+function taskCard(t){
+  return `<div class="card" id="card-${t.id}" draggable="true"
+    ondragstart="dragStart(event,'${t.id}','task')" ondragend="dragEnd()">
+    <div class="card-top">
+      <span>${tipoIcon(t.tipo)}</span>
+      <span class="card-title">${t.titulo}</span>
+    </div>
+    ${!filterArea?`<div style="margin-bottom:6px"><span class="badge ${areaClass(t.area)}">${t.area}</span></div>`:''}
+    <div class="card-meta">
+      <span class="chip">${t.tipo}</span>
+      ${t.fecha?`<span class="chip date">${fmtDate(t.fecha)}</span>`:''}
+      ${t.horaInicio?`<span class="chip">${t.horaInicio}${t.horaFin?'â€“'+t.horaFin:''}</span>`:''}
+      ${t.costoCLP?`<span class="chip monto">${fmtCLP(t.costoCLP)}</span>`:''}
+      ${t.proyecto?`<span class="chip">${t.proyecto}</span>`:''}
+    </div>
+    ${t.detalle?`<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">${t.detalle}</div>`:''}
+    <div class="card-actions">
+      <button onclick="openModal('${t.id}')">âœï¸ Editar</button>
+      <button onclick="cycleEstado('${t.id}')">â†’ Mover</button>
+      <button class="del" onclick="doDeleteTask('${t.id}')">ðŸ—‘</button>
+    </div>
+  </div>`;
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// PEDIDOS PIPELINE
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+async function renderPedidos() {
+  setContent('<div style="padding:30px;text-align:center;color:var(--muted)">Cargando...</div>');
+  const pedidos = await getPedidos();
+  setContent(`
+    <div class="pipeline">
+      ${PED_STAGES.map(stage=>{
+        const items=pedidos.filter(p=>p.estado===stage);
+        return `<div class="pip-col">
+          <div class="pip-header" style="border-top:3px solid ${P_COLORS[stage]}">${stage} <span style="float:right;opacity:.5">${items.length}</span></div>
+          <div class="pip-body" id="pip-${slug(stage)}"
+            ondragover="dragOver(event,'${stage}',true)"
+            ondrop="dropPedido(event,'${stage}')"
+            ondragleave="this.classList.remove('drag-over')">
+            ${items.length===0?'<div class="empty" style="padding:10px">â€”</div>':''}
+            ${items.map(p=>pedidoCard(p)).join('')}
+            <button style="width:100%;padding:6px;border:1px dashed var(--border);border-radius:6px;background:none;color:var(--muted);cursor:pointer;font-size:11px;margin-top:4px" onclick="openPedidoModal(null,'${stage}')">ï¼‹</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`);
+}
+
+function pedidoCard(p){
+  return `<div class="pip-card" id="pip-card-${p.id}" draggable="true"
+    ondragstart="dragStart(event,'${p.id}','pedido')" ondragend="dragEnd()">
+    <strong style="font-size:12px">${p.pedido}</strong>
+    <div class="pclient">ðŸ‘¤ ${p.cliente}</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:2px">${p.producto||''}</div>
+    <div class="pmonto">${fmtCLP(p.monto)} ${p.pagado?'âœ…':'ðŸ’³'}</div>
+    ${p.fechaEntrega?`<div class="pfecha">ðŸ“… ${fmtDate(p.fechaEntrega)}</div>`:''}
+    <div style="display:flex;gap:4px;margin-top:8px">
+      <button style="padding:2px 7px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:10px;cursor:pointer" onclick="openPedidoModal('${p.id}')">âœï¸</button>
+      <button style="padding:2px 7px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--danger);font-size:10px;cursor:pointer" onclick="doDeletePedido('${p.id}')">ðŸ—‘</button>
+    </div>
+  </div>`;
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// DRAG & DROP
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function dragStart(e,id,type){dragId=id;dragType=type;setTimeout(()=>{const el=document.getElementById((type==='pedido'?'pip-card-':'card-')+id);if(el)el.classList.add('dragging')},0)}
+function dragEnd(){document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'))}
+function dragOver(e,col,pip=false){e.preventDefault();const el=document.getElementById((pip?'pip-':'col-')+slug(col));if(el)el.classList.add('drag-over')}
+async function dropTask(e,estado){
+  e.preventDefault();document.querySelectorAll('.col-body').forEach(el=>el.classList.remove('drag-over'));
+  if(dragType!=='task')return;
+  await updateTask(dragId,{estado}); renderBitacora(); toast(`â†’ ${estado}`);
+}
+async function dropPedido(e,estado){
+  e.preventDefault();document.querySelectorAll('.pip-body').forEach(el=>el.classList.remove('drag-over'));
+  if(dragType!=='pedido')return;
+  await updatePedido(dragId,{estado}); renderPedidos(); toast(`â†’ ${estado}`);
+}
+async function cycleEstado(id){
+  const tasks=await getTasks();const t=tasks.find(x=>x.id===id);if(!t)return;
+  const next=ESTADOS[(ESTADOS.indexOf(t.estado)+1)%ESTADOS.length];
+  await updateTask(id,{estado:next}); renderBitacora(); toast(`â†’ ${next}`);
+}
+async function doDeleteTask(id){
+  if(!confirm('Â¿Eliminar actividad?'))return;
+  await deleteTask(id); closeModal(); renderBitacora(); toast('ðŸ—‘ Eliminada');
+}
+async function doDeletePedido(id){
+  if(!confirm('Â¿Eliminar pedido?'))return;
+  await deletePedido(id); closeModal(); renderPedidos(); toast('ðŸ—‘ Eliminado');
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// TASK MODAL
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+async function openModal(id,defEstado,defArea){
+  editingId=id||null; editingType='task';
+  let t=null;
+  if(id){ const tasks=await getTasks(); t=tasks.find(x=>x.id===id); }
+  document.getElementById('modal-title').textContent=id?'âœï¸ Editar actividad':'ï¼‹ Nueva actividad';
+  document.getElementById('modal-body').innerHTML=`
+    <div class="form-group"><label>Actividad *</label><input id="f-titulo" type="text" value="${t?.titulo||''}"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Ãrea</label><select id="f-area">
+        ${AREAS.map(a=>`<option value="${a.key}" ${(t?.area||defArea||'ðŸ¦º SST')===a.key?'selected':''}>${a.key}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Tipo</label><select id="f-tipo">
+        ${TIPOS.map(tp=>`<option value="${tp}" ${(t?.tipo||'ðŸ“‹ Tarea')===tp?'selected':''}>${tp}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Estado</label><select id="f-estado">
+        ${ESTADOS.map(e=>`<option value="${e}" ${(t?.estado||defEstado||'â¬œ Por hacer')===e?'selected':''}>${e}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Proyecto</label><input id="f-proyecto" type="text" value="${t?.proyecto||''}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Fecha</label><input id="f-fecha" type="date" value="${t?.fecha||''}"></div>
+      <div class="form-group"><label>Costo CLP</label><input id="f-costo" type="number" value="${t?.costoCLP||''}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Hora inicio</label><input id="f-hi" type="time" value="${t?.horaInicio||''}"></div>
+      <div class="form-group"><label>Hora fin</label><input id="f-hf" type="time" value="${t?.horaFin||''}"></div>
+    </div>
+    <div class="form-group"><label>Detalle</label><textarea id="f-detalle">${t?.detalle||''}</textarea></div>
+    <div class="modal-footer">
+      ${id?`<button class="btn btn-danger" onclick="doDeleteTask('${id}')">ðŸ—‘</button>`:''}
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveTask()">Guardar</button>
+    </div>`;
+  document.getElementById('overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('f-titulo').focus(),100);
+}
+
+async function saveTask(){
+  const titulo=document.getElementById('f-titulo').value.trim();
+  if(!titulo){document.getElementById('f-titulo').style.borderColor='var(--danger)';return;}
+  const obj={
+    titulo,
+    area:document.getElementById('f-area').value,
+    tipo:document.getElementById('f-tipo').value,
+    estado:document.getElementById('f-estado').value,
+    proyecto:document.getElementById('f-proyecto').value,
+    detalle:document.getElementById('f-detalle').value,
+    fecha:document.getElementById('f-fecha').value,
+    horaInicio:document.getElementById('f-hi').value,
+    horaFin:document.getElementById('f-hf').value,
+    costoCLP:parseInt(document.getElementById('f-costo').value)||null,
+  };
+  if(editingId) await updateTask(editingId,obj);
+  else await createTask(obj);
+  closeModal(); toast(editingId?'âœ… Actualizada':'âœ… Creada');
+  if(currentView==='bitacora') renderBitacora(); else renderDashboard();
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// PEDIDO MODAL
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+async function openPedidoModal(id,defStage){
+  editingId=id||null; editingType='pedido';
+  let p=null;
+  if(id){ const pedidos=await getPedidos(); p=pedidos.find(x=>x.id===id); }
+  document.getElementById('modal-title').textContent=id?'âœï¸ Editar pedido':'ðŸ“¦ Nuevo pedido';
+  document.getElementById('modal-body').innerHTML=`
+    <div class="form-group"><label>Nombre del pedido *</label><input id="p-nombre" type="text" value="${p?.pedido||''}"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Cliente</label><input id="p-cliente" type="text" value="${p?.cliente||''}"></div>
+      <div class="form-group"><label>Estado</label><select id="p-estado">
+        ${PED_STAGES.map(s=>`<option value="${s}" ${(p?.estado||defStage||'Cotizando')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-group"><label>Producto</label><input id="p-prod" type="text" value="${p?.producto||''}"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Monto CLP</label><input id="p-monto" type="number" value="${p?.monto||''}"></div>
+      <div class="form-group"><label>Fecha entrega</label><input id="p-fecha" type="date" value="${p?.fechaEntrega||''}"></div>
+    </div>
+    <div class="form-group"><label><input type="checkbox" id="p-pagado" ${p?.pagado?'checked':''}> Pagado</label></div>
+    <div class="form-group"><label>Notas</label><textarea id="p-notas">${p?.notas||''}</textarea></div>
+    <div class="modal-footer">
+      ${id?`<button class="btn btn-danger" onclick="doDeletePedido('${id}')">ðŸ—‘</button>`:''}
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePedido()">Guardar</button>
+    </div>`;
+  document.getElementById('overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('p-nombre').focus(),100);
+}
+
+async function savePedido(){
+  const nombre=document.getElementById('p-nombre').value.trim();
+  if(!nombre){document.getElementById('p-nombre').style.borderColor='var(--danger)';return;}
+  const obj={
+    pedido:nombre,
+    cliente:document.getElementById('p-cliente').value,
+    estado:document.getElementById('p-estado').value,
+    producto:document.getElementById('p-prod').value,
+    monto:parseInt(document.getElementById('p-monto').value)||0,
+    fechaEntrega:document.getElementById('p-fecha').value,
+    pagado:document.getElementById('p-pagado').checked,
+    notas:document.getElementById('p-notas').value,
+  };
+  if(editingId) await updatePedido(editingId,obj);
+  else await createPedido(obj);
+  closeModal(); toast(editingId?'âœ… Pedido actualizado':'âœ… Pedido creado');
+  if(currentView==='pedidos') renderPedidos(); else renderDashboard();
+}
+
+function closeModal(e){
+  if(e&&e.target!==document.getElementById('overlay'))return;
+  document.getElementById('overlay').classList.remove('open');
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// CHAT
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+async function loadChatHistory(){
+  try{
+    const {data}=await sb.from('chat_history').select('*').order('created_at',{ascending:true}).limit(40);
+    chatHistory=(data||[]).map(r=>({role:r.role,content:r.content}));
+    renderChatMessages();
+  }catch(e){chatHistory=[];}
+}
+
+function toggleChat(){
+  chatOpen=!chatOpen;
+  document.getElementById('chat-panel').classList.toggle('open',chatOpen);
+  document.getElementById('btn-chat').classList.toggle('active',chatOpen);
+  if(chatOpen && chatHistory.length===0){
+    welcomeMsg();
+  }
+  if(chatOpen) setTimeout(scrollChat,100);
+}
+
+async function welcomeMsg(){
+  const [tasks,pedidos]=await Promise.all([getTasks(),getPedidos()]);
+  const act=tasks.filter(t=>t.estado!=='âœ… Finalizado').length;
+  const ped=pedidos.filter(p=>!['Entregado','Cancelado'].includes(p.estado)).length;
+  addBotMsg(`Â¡Hola Carlos! ðŸ‘‹\n\nTienes **${act} tareas activas** y **${ped} pedidos en curso**.\n\nCuÃ©ntame quÃ© pasÃ³ hoy o quÃ© necesitas anotar.`);
+}
+
+function renderChatMessages(){
+  const el=document.getElementById('chat-messages');
+  el.innerHTML=chatHistory.map(m=>msgHTML(m.role,m.content)).join('');
+}
+
+function msgHTML(role,content){
+  return `<div class="msg ${role}">
+    <div class="mavatar">${role==='user'?'ðŸ‘¤':'âœ¦'}</div>
+    <div class="mbubble">${fmt(content)}</div>
+  </div>`;
+}
+
+function addBotMsg(text){
+  chatHistory.push({role:'assistant',content:text});
+  const el=document.getElementById('chat-messages');
+  const div=document.createElement('div');
+  div.innerHTML=msgHTML('assistant',text);
+  el.appendChild(div.firstChild);
+  scrollChat();
+}
+
+function addUserMsg(text){
+  const el=document.getElementById('chat-messages');
+  const div=document.createElement('div');
+  div.innerHTML=msgHTML('user',text);
+  el.appendChild(div.firstChild);
+  scrollChat();
+}
+
+function showThinking(){
+  const el=document.getElementById('chat-messages');
+  const div=document.createElement('div');
+  div.id='thinking';div.className='msg assistant';
+  div.innerHTML=`<div class="mavatar">âœ¦</div><div class="thinking"><span></span><span></span><span></span></div>`;
+  el.appendChild(div); scrollChat();
+}
+function hideThinking(){const el=document.getElementById('thinking');if(el)el.remove();}
+function scrollChat(){const el=document.getElementById('chat-messages');setTimeout(()=>el.scrollTop=el.scrollHeight,50)}
+function setAiStatus(t){document.getElementById('ai-status-txt').textContent=t}
+
+function quickSend(msg){document.getElementById('chat-input').value=msg;sendChat();}
+function chatKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}}
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px'}
+
+async function sendChat(){
+  if(aiThinking)return;
+  const input=document.getElementById('chat-input');
+  const text=input.value.trim(); if(!text)return;
+
+  chatHistory.push({role:'user',content:text});
+  addUserMsg(text);
+  input.value=''; input.style.height='auto';
+
+  // Save user message to Supabase
+  sb.from('chat_history').insert({role:'user',content:text}).then(()=>{});
+
+  aiThinking=true;
+  document.getElementById('send-btn').disabled=true;
+  showThinking();
+  setAiStatus('Pensando...');
+
+  try{
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ history: chatHistory }),
+    });
+    if(!res.ok){
+      const err=await res.json().catch(()=>({}));
+      throw new Error(err.error||`Error ${res.status}`);
+    }
+    const {reply, actions}=await res.json();
+    hideThinking();
+    addBotMsg(reply);
+    chatHistory.push({role:'assistant',content:reply});
+
+    // Refresh view if AI made changes
+    if(actions&&actions.length>0){
+      setTimeout(()=>{
+        if(currentView==='dashboard') renderDashboard();
+        else if(currentView==='bitacora') renderBitacora();
+        else if(currentView==='pedidos') renderPedidos();
+        // Highlight new/updated items
+        actions.forEach(a=>{
+          if(a.result?.id){
+            setTimeout(()=>highlightCard(a.result.id),600);
+          }
+        });
+      },400);
+    }
+  }catch(err){
+    hideThinking();
+    const msg=err.message.includes('Failed to fetch')
+      ?'âŒ No se pudo conectar al servidor. Â¿EstÃ¡ desplegado en Vercel?'
+      :`âŒ ${err.message}`;
+    addBotMsg(msg);
+  }finally{
+    aiThinking=false;
+    document.getElementById('send-btn').disabled=false;
+    setAiStatus('Listo');
+  }
+}
+
+function highlightCard(id){
+  const el=document.getElementById('card-'+id)||document.getElementById('pip-card-'+id);
+  if(el){el.classList.add('ai-highlight');setTimeout(()=>el.classList.remove('ai-highlight'),2000);}
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// HELPERS
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function setContent(html){document.getElementById('content').innerHTML=html}
+function tipoIcon(t){return({'ðŸ“‹ Tarea':'ðŸ“‹','âš™ï¸ Avance':'âš™ï¸','ðŸ›’ Compra':'ðŸ›’','ðŸ’¡ Idea':'ðŸ’¡','ðŸ“ Nota':'ðŸ“','â° Recordatorio':'â°','ðŸ“‹ InspecciÃ³n':'ðŸ”'})[t]||'ðŸ“Œ'}
+function areaClass(a){return({'ðŸ¦º SST':'a-sst','ðŸ—ï¸ CRD':'a-crd','ðŸ½ï¸ ENEFOOD':'a-ene','ðŸ“ˆ Trading':'a-trd','ðŸ’» ProgramaciÃ³n':'a-prog','ðŸ–¨ï¸ ImpresiÃ³n 3D':'a-imp','ðŸ  Casa':'a-casa'})[a]||'a-sst'}
+function fmtCLP(n){return n?'$'+Number(n).toLocaleString('es-CL'):'$0'}
+function fmtDate(d){if(!d)return'';const[y,m,day]=d.split('-');return`${parseInt(day)} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(m)-1]}`}
+function slug(s){return s.replace(/[^a-z0-9]/gi,'_').toLowerCase()}
+function fmt(t){return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/_(.*?)_/g,'<em>$1</em>').replace(/\n/g,'<br>')}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500)}
+
+// Keyboard
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeModal();
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){
+    if(document.getElementById('overlay').classList.contains('open')){
+      editingType==='task'?saveTask():savePedido();
+    }
+  }
+});
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// INIT â€” check if already configured
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+(function(){
+  const cfg=localStorage.getItem(SB_KEY);
+  if(cfg){
+    try{
+      const{url,anon}=JSON.parse(cfg);
+      document.getElementById('sb-url').value=url;
+      document.getElementById('sb-anon').value=anon;
+      initApp(url,anon);
+    }catch(e){localStorage.removeItem(SB_KEY);}
+  }
+})();
+</script>
+</body>
+</html>
